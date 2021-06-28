@@ -9,6 +9,7 @@ import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 
 import './interfaces/IBaseOracle.sol';
 import "./interfaces/IPancakePair.sol";
+import "./interfaces/IInsuranceMining.sol";
 
 // This contract is owned by Timelock.
 contract Insurance is Ownable {
@@ -26,6 +27,7 @@ contract Insurance is Ownable {
     address public wbnb;
     IBaseOracle tokenPriceOracle;
     IBaseOracle pairPriceOracle;
+    IInsuranceMining insuranceMining;
 
     mapping(address => bool) public isStableToken;
 
@@ -112,6 +114,10 @@ contract Insurance is Ownable {
 
     function setStableToken(address _token, bool _isStable) external onlyOwner {
         isStableToken[_token] = _isStable;
+    }
+
+    function setInsuranceMining(IInsuranceMining _insuranceMining) external onlyOwner {
+        insuranceMining = _insuranceMining;
     }
 
     function createMarket(uint256 _marketId, address _lpToken, uint256 _expiration, uint256 _paymentRatio, uint256 _minimumAmount) external onlyOwner {
@@ -225,6 +231,10 @@ contract Insurance is Ownable {
 
         // Stake the LP token.
         IERC20(marketMap[_marketId].lpToken).safeTransferFrom(msg.sender, address(this), _lpTokenAmount);
+
+        if(address(insuranceMining) != address(0)) {
+            insuranceMining.pendingMining(_marketId,_seller,msg.sender, _amount);
+        }
 
         emit Buy(msg.sender, _marketId, buyerPolicyIndexMap[_marketId][msg.sender].length - 1,
             _seller, sellerPolicyIndexMap[_marketId][_seller].length - 1, _index, _amount,
